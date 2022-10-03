@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import Add from "../img/addAvatar.png";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from '../firebase';
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth, db, storage } from '../firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { doc, setDoc } from "firebase/firestore";
 
 
 const Register = () => {
@@ -21,8 +23,40 @@ const [err, setErr] = useState(false)
   // upload img  https://firebase.google.com/docs/storage/web/upload-files
   // try-catch文は、プログラム中で例外が発生するか試して(try)、例外が発生したら捕まえて(catch)、何かしらの処理を行いたい場合に使います。
 
+  //DBへユーザー情報を格納するhttps://firebase.google.com/docs/firestore/manage-data/add-data
+
   try{
-    const res = createUserWithEmailAndPassword(auth, email, password)
+    //ユーザー登録
+    const res = await createUserWithEmailAndPassword(auth, email, password);
+
+    //画像の保存
+const storageRef = ref(storage, displayName);
+const uploadTask = uploadBytesResumable(storageRef, file);
+
+uploadTask.on('state_changed',
+  (error) => {
+    setErr(true);
+  },
+  () => {
+    getDownloadURL(uploadTask.snapshot.ref).then(async(downloadURL) => {
+      //updateProfile　firebaseの関数　authデータ更新
+       await updateProfile(res.user,{
+        displayName,
+        photoURL:downloadURL,
+       });
+
+       //ユーザーをfirestoreに保存する
+       await setDoc(doc(db, "users", res.user.uid), {
+        uid: res.user.uid,
+        displayName,
+        email,
+        photoURL: downloadURL,
+      });
+
+    });
+  }
+);
+
   }catch(err){
      setErr(true);
   }
