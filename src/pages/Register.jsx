@@ -4,10 +4,12 @@ import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { doc, setDoc } from "firebase/firestore";
+import { Link, useNavigate } from 'react-router-dom';
 
 
 const Register = () => {
 const [err, setErr] = useState(false)
+const navigate = useNavigate();
   // 非同期処理
  const handleSubmit =async (e) =>{
   // preventDefault勝手にイベントするのを防ぐ
@@ -30,43 +32,44 @@ const [err, setErr] = useState(false)
     const res = await createUserWithEmailAndPassword(auth, email, password);
 
     //画像の保存
-const storageRef = ref(storage, displayName);
-const uploadTask = uploadBytesResumable(storageRef, file);
+    const date = new Date().getTime();
+    const storageRef = ref(storage, `${displayName + date}`);
+    await uploadBytesResumable(storageRef, file).then(() => {
+    getDownloadURL(storageRef).then(async (downloadURL) => {
+    try {
 
-uploadTask.on('state_changed',
-  (error) => {
-    setErr(true);
-  },
-  () => {
-    getDownloadURL(uploadTask.snapshot.ref).then(async(downloadURL) => {
+
       //updateProfile　firebaseの関数　authデータ更新
        await updateProfile(res.user,{
         displayName,
         photoURL:downloadURL,
        });
 
-       //ユーザーをfirestoreに保存する
-       await setDoc(doc(db, "users", res.user.uid), {
+       //ユーザーをfirestoreに保存する(できない)
+       //https://www.youtube.com/watch?v=k4mjF4sPITE&t=4355s
+       //https://codingshiksha.com/react/react-js-firebase-auth-project-to-build-facebook-group-chat-messenger-clone-using-context-api-redux/
+      await setDoc(doc(db, "users", res.user.uid), {
         uid: res.user.uid,
         displayName,
         email,
         photoURL: downloadURL,
       });
 
-    });
-  }
-);
+      await setDoc(doc(db, "usersChats", res.user.uid), {});
+      navigate("/")
+      
+
+    } catch (err) {
+      console.log(err);
+     
+    }
+  });
+});
 
   }catch(err){
      setErr(true);
   }
- 
-    
-
-
  };
-
-
   return (
     <div className='formContainer'>
       <div className='formWrapper'>
@@ -82,14 +85,12 @@ uploadTask.on('state_changed',
               <img src={Add} alt=''></img>
               <span>Add anavatar</span>
             </label>
-            
-           
-         
+
           <button>Sign up</button>
           {/* err && 左側がtrueであれば右側を実行する */}
           {err && <span>something went wrong</span>}
         </form>
-        <p>You do have an account? Login</p>
+        <p>You do have an account? <Link to="/login">login</Link></p>
       </div>
       
     </div>
